@@ -28,12 +28,18 @@ jobs:
         run: eas config --platform android
 
       - name: Build APK
-        run: eas build --platform android --profile preview --non-interactive
+        run: |
+          eas build --platform android --profile preview --non-interactive --output=android-app.apk
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Check built files
+        run: ls -la
 
       - name: Upload APK
         uses: actions/upload-artifact@v3
         with:
           name: android-app
-          path: android-app.apk
+          path: |
+            android-app.apk
+            **/*.apk
