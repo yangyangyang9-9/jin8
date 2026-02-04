@@ -26,7 +26,9 @@ jobs:
 
       - name: Build APK
         run: |
-          eas build --platform android --profile preview --non-interactive --wait
+          npx expo install --fix -- --legacy-peer-deps && npx expo install react-native-web react-dom @expo/metro-runtime
+          npx expo export --platform web
+          npx expo build:android -t apk --no-publish
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
