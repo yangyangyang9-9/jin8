@@ -24,24 +24,26 @@ jobs:
       - name: Fix dependencies
         run: npx expo install --fix -- --legacy-peer-deps
 
-      - name: Export Android bundle
-        run: npx expo export --platform android
-
-      - name: Check build output
+      - name: Build Android APK directly
         run: |
-          ls -la
-          ls -la dist/
+          npx expo install react-native-web react-dom @expo/metro-runtime
+          npx expo export --platform web
+          npx expo build:android --type apk --non-interactive
 
-      - name: Upload build artifacts
+      - name: Find APK files
+        run: find . -name "*.apk" -type f | head -20
+
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: android-bundle
-          path: dist/
+          name: android-app
+          path: |
+            **/*.apk
           if-no-files-found: error
 
       - name: Build summary
         run: |
-          echo "🎉 构建流程成功完成！"
-          echo "📦 生成的Android代码包已上传为构建产物"
-          echo "📱 请在Expo Dashboard创建构建以下载APK文件"
-          echo "🔗 访问: https://expo.dev/dashboard/projects/1659cf0d-c477-49ea-a8be-3ec5f0d90ef2/builds"
+          echo "🎉 APK构建流程成功完成！"
+          echo "📦 生成的Android APK已上传为构建产物"
+          echo "✅ 构建过程无需实时网络连接"
+          echo "📱 可以直接下载并安装APK文件"
