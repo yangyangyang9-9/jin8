@@ -26,17 +26,20 @@ jobs:
 
       - name: Build APK
         run: |
-          eas build --platform android --profile preview --non-interactive --output=android-app.apk
+          eas build --platform android --profile preview --non-interactive --wait
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
       - name: Check built files
         run: ls -la
 
+      - name: Find APK files
+        run: find . -name "*.apk" -type f | head -20
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: android-app
           path: |
-            android-app.apk
             **/*.apk
+          if-no-files-found: warn
