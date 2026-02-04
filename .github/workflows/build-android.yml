@@ -2,9 +2,7 @@ name: Build Android APK
 
 on:
   push:
-    branches: [ master ]
-  pull_request:
-    branches: [ master ]
+    branches: [ "master" ]
 
 jobs:
   build:
@@ -16,34 +14,18 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
 
       - name: Install dependencies
-        run: npm install --legacy-peer-deps
+        run: npm install
 
-      - name: Fix dependencies
-        run: npx expo install --fix -- --legacy-peer-deps
+      - name: Install EAS CLI
+        run: npm install -g eas-cli
 
-      - name: Build Android APK directly
+      - name: Build APK with EAS
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
-          npx expo install react-native-web react-dom @expo/metro-runtime
-          npx expo export --platform web
-          CI=1 eas build --platform android --profile preview --wait
-
-      - name: Find APK files
-        run: find . -name "*.apk" -type f | head -20
-
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: android-app
-          path: |
-            **/*.apk
-          if-no-files-found: error
-
-      - name: Build summary
-        run: |
-          echo "🎉 APK构建流程成功完成！"
-          echo "📦 生成的Android APK已上传为构建产物"
-          echo "✅ 构建过程无需实时网络连接"
-          echo "📱 可以直接下载并安装APK文件"
+          eas build \
+            --platform android \
+            --profile apk \
+            --non-interactive
