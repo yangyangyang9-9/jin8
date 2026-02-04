@@ -15,7 +15,7 @@ jobs:
 
       - uses: actions/setup-node@v3
         with:
-          node-version: 18
+          node-version: 20
           cache: 'npm'
 
       - name: Install dependencies
@@ -26,9 +26,8 @@ jobs:
 
       - name: Build APK
         run: |
-          npx expo install --fix -- --legacy-peer-deps && npx expo install react-native-web react-dom @expo/metro-runtime
-          npx expo export --platform web
-          npx expo build:android -t apk --no-publish
+          npx expo install --fix -- --legacy-peer-deps
+          eas build --platform android --profile preview --non-interactive --local
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
