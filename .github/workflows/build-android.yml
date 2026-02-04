@@ -24,9 +24,6 @@ jobs:
       - name: Install EAS CLI
         run: npm install -g eas-cli
 
-      - name: Configure Expo
-        run: eas config --platform android
-
       - name: Build APK
         run: |
           eas build --platform android --profile preview --non-interactive --output=android-app.apk
