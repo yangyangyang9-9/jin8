@@ -27,7 +27,8 @@ jobs:
       - name: Build APK
         run: |
           npx expo install --fix -- --legacy-peer-deps
-          eas build --platform android --profile preview --non-interactive
+          npx expo export --platform android
+          echo "构建完成！请在Expo Dashboard下载APK文件"
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
