@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Alert, Modal, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../services/supabase';
-import { getCurrentUserId } from '../services/authService';
+import { getCurrentUserId, getUserProductionLines } from '../services/authService';
 
 const ManagementScreen = ({ navigation }) => {
   // 初始化生产线数据为空数组
@@ -18,21 +18,15 @@ const ManagementScreen = ({ navigation }) => {
       try {
         const userId = await getCurrentUserId();
         if (userId) {
-          const { data, error } = await supabase
-            .from('production_lines')
-            .select('*')
-            .eq('owner_id', userId)
-            .eq('is_active', true);
-
-          if (error) {
-            console.error('获取生产线失败:', error);
-            Alert.alert('错误', '获取生产线失败');
-          } else {
+          // 使用getUserProductionLines函数获取用户拥有的和加入的所有生产线
+          const allLines = await getUserProductionLines(userId);
+          
+          if (allLines && allLines.length > 0) {
             // 检查并更新到期的生产线状态
             const now = new Date();
             const updatedLines = [];
             
-            for (const line of data || []) {
+            for (const line of allLines) {
               const expireDate = new Date(line.expire_date);
               
               // 如果生产线已到期且状态为启用，则更新为停用
@@ -157,16 +151,24 @@ const ManagementScreen = ({ navigation }) => {
           style: 'destructive',
           onPress: async () => {
             try {
+              const userId = await getCurrentUserId();
+              
               // 获取生产线详情
               const { data: lineData, error: fetchError } = await supabase
                 .from('production_lines')
-                .select('expire_date, status')
+                .select('expire_date, status, owner_id')
                 .eq('id', id)
                 .single();
 
               if (fetchError) {
                 console.error('获取生产线详情失败:', fetchError);
                 Alert.alert('错误', '获取生产线详情失败');
+                return;
+              }
+
+              // 检查是否是生产线的所有者
+              if (lineData.owner_id !== userId) {
+                Alert.alert('提示', '只有生产线的所有者才能删除生产线');
                 return;
               }
 
@@ -247,13 +249,16 @@ const ManagementScreen = ({ navigation }) => {
                 <Text style={styles.expireDate}>到期时间: {new Date(line.expire_date).toLocaleDateString()}</Text>
                 <Text style={styles.planText}>计费方案: {line.plan}</Text>
                 <Text style={styles.priceText}>价格: ¥{line.price.toFixed(2)}</Text>
+                <Text style={styles.roleText}>角色: {line.memberRole || '未知'}</Text>
               </View>
-              <TouchableOpacity 
-                style={styles.deleteButton}
-                onPress={() => handleDeleteProductionLine(line.id)}
-              >
-                <Ionicons name="trash" size={20} color="#FF5252" />
-              </TouchableOpacity>
+              {line.memberRole === '金主' && (
+                <TouchableOpacity 
+                  style={styles.deleteButton}
+                  onPress={() => handleDeleteProductionLine(line.id)}
+                >
+                  <Ionicons name="trash" size={20} color="#FF5252" />
+                </TouchableOpacity>
+              )}
             </TouchableOpacity>
           ))
         )}
@@ -336,6 +341,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#D4AF37',
     fontWeight: '500',
+  },
+  roleText: {
+    fontSize: 14,
+    color: '#D4AF37',
+    fontWeight: '500',
+    marginTop: 4,
   },
   header: {
     flexDirection: 'row',

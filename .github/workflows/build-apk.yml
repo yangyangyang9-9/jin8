@@ -1,0 +1,50 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+    # Allows manually triggering the workflow
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install Expo CLI
+        run: npm install -g expo-cli
+
+      - name: Install EAS CLI
+        run: npm install -g eas-cli
+
+      - name: Configure Expo
+        run: |
+          npx expo install --fix -- --legacy-peer-deps
+          npx expo install react-native-web react-dom @expo/metro-runtime
+
+      - name: Build APK
+        run: npx eas build --platform android --profile preview --non-interactive
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-apk
+          path: |
+            **/*.apk
+          if-no-files-found: warn

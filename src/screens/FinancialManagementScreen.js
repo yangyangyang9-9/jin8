@@ -104,6 +104,11 @@ const FinancialManagementScreen = ({ navigation, route }) => {
     return () => unsubscribe();
   }, []);
 
+  // 监听财务记录变化，实时更新财务概览
+  useEffect(() => {
+    calculateFinancials();
+  }, [sales, expenses]);
+
   // 计算财务数据
   const calculateFinancials = () => {
     // 确保sales和expenses是数组
@@ -219,11 +224,11 @@ const FinancialManagementScreen = ({ navigation, route }) => {
     }
   };
 
-  // 删除财务记录（仅金主可操作）
+  // 删除财务记录（金主和线长可操作）
   const handleDeleteFinancialRecord = async (record, recordType) => {
-    // 检查用户是否为金主角色
-    if (userRole !== '金主') {
-      Alert.alert('提示', '只有金主角色可以删除财务记录');
+    // 检查用户是否为金主或线长角色
+    if (userRole !== '金主' && userRole !== '线长') {
+      Alert.alert('提示', '只有金主和线长角色可以删除财务记录');
       return;
     }
 
@@ -335,13 +340,13 @@ const FinancialManagementScreen = ({ navigation, route }) => {
                 {sales.map((sale) => (
               <View key={sale.id} style={styles.recordItem}>
                 <View style={styles.recordInfo}>
-                  <Text style={styles.recordDate}>{sale.date}</Text>
-                  <Text style={styles.recordNotes}>{sale.description || '无备注'}</Text>
+                  <Text style={styles.recordDate} selectable>{sale.date}</Text>
+                  <Text style={styles.recordNotes} selectable>{sale.description || '无备注'}</Text>
                 </View>
                 <View style={styles.recordAmountContainer}>
-                  <Text style={styles.saleAmount}>+¥{sale.amount} 元</Text>
-                  {/* 只有金主角色显示删除按钮 */}
-                  {userRole === '金主' && (
+                  <Text style={styles.saleAmount} selectable>¥{sale.amount} 元</Text>
+                  {/* 金主和线长角色显示删除按钮 */}
+                  {(userRole === '金主' || userRole === '线长') && (
                     <TouchableOpacity 
                       style={styles.deleteButton}
                       onPress={() => handleDeleteFinancialRecord(sale, 'sales')}
@@ -366,14 +371,14 @@ const FinancialManagementScreen = ({ navigation, route }) => {
                 {expenses.map((expense) => (
               <View key={expense.id} style={styles.recordItem}>
                 <View style={styles.recordInfo}>
-                  <Text style={styles.recordDate}>{expense.date}</Text>
-                  <Text style={styles.recordType}>{expense.category}</Text>
-                  <Text style={styles.recordNotes}>{expense.description || '无备注'}</Text>
+                  <Text style={styles.recordDate} selectable>{expense.date}</Text>
+                  <Text style={styles.recordType} selectable>{expense.category}</Text>
+                  <Text style={styles.recordNotes} selectable>{expense.description || '无备注'}</Text>
                 </View>
                 <View style={styles.recordAmountContainer}>
-                  <Text style={styles.expenseAmount}>-¥{expense.amount} 元</Text>
-                  {/* 只有金主角色显示删除按钮 */}
-                  {userRole === '金主' && (
+                  <Text style={styles.expenseAmount} selectable>-¥{expense.amount} 元</Text>
+                  {/* 金主和线长角色显示删除按钮 */}
+                  {(userRole === '金主' || userRole === '线长') && (
                     <TouchableOpacity 
                       style={styles.deleteButton}
                       onPress={() => handleDeleteFinancialRecord(expense, 'expenses')}
@@ -532,7 +537,7 @@ const FinancialManagementScreen = ({ navigation, route }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#121212',
   },
   header: {
     flexDirection: 'row',
@@ -540,6 +545,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#D4AF37', // 黄金色
     padding: 20,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   backButton: {
     padding: 5,
@@ -556,10 +569,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   overviewCard: {
-    backgroundColor: 'white',
+    backgroundColor: '#2d2d2d',
     margin: 10,
     padding: 20,
-    borderRadius: 8,
+    borderRadius: 12,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -573,7 +586,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     marginBottom: 15,
-    color: '#333',
+    color: '#D4AF37',
   },
   overviewGrid: {
     flexDirection: 'row',
@@ -582,14 +595,16 @@ const styles = StyleSheet.create({
   overviewItem: {
     flex: 1,
     alignItems: 'center',
-    padding: 10,
-    backgroundColor: '#f9f9f9',
-    borderRadius: 8,
+    padding: 15,
+    backgroundColor: '#3a3a3a',
+    borderRadius: 12,
     marginHorizontal: 5,
+    borderLeftWidth: 3,
+    borderLeftColor: '#D4AF37',
   },
   overviewLabel: {
     fontSize: 14,
-    color: '#666',
+    color: '#cccccc',
     marginBottom: 5,
   },
   overviewValue: {
@@ -613,8 +628,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 15,
-    borderRadius: 8,
+    borderRadius: 12,
     marginHorizontal: 5,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 3,
   },
   saleButton: {
     backgroundColor: '#4CAF50',
@@ -629,10 +652,10 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
   recordCard: {
-    backgroundColor: 'white',
+    backgroundColor: '#2d2d2d',
     margin: 10,
     padding: 20,
-    borderRadius: 8,
+    borderRadius: 12,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -651,25 +674,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: '#444',
   },
   recordInfo: {
     flex: 1,
   },
   recordDate: {
     fontSize: 14,
-    color: '#666',
+    color: '#cccccc',
     marginBottom: 4,
   },
   recordType: {
     fontSize: 14,
-    color: '#333',
+    color: '#ffffff',
     fontWeight: '500',
     marginBottom: 4,
   },
   recordNotes: {
     fontSize: 12,
-    color: '#999',
+    color: '#999999',
   },
   saleAmount: {
     fontSize: 16,
@@ -683,7 +706,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     textAlign: 'center',
-    color: '#999',
+    color: '#cccccc',
     paddingVertical: 20,
   },
   loadingContainer: {
@@ -694,17 +717,17 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    color: '#666',
+    color: '#cccccc',
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: 'white',
-    borderRadius: 8,
+    backgroundColor: '#2d2d2d',
+    borderRadius: 12,
     padding: 20,
     width: '80%',
     maxWidth: 400,
@@ -714,14 +737,17 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 20,
     textAlign: 'center',
+    color: '#D4AF37',
   },
   modalInput: {
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#444',
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
     marginBottom: 15,
+    backgroundColor: '#3a3a3a',
+    color: '#ffffff',
   },
   modalTextArea: {
     height: 80,
@@ -732,7 +758,7 @@ const styles = StyleSheet.create({
   },
   typeLabel: {
     fontSize: 14,
-    color: '#666',
+    color: '#cccccc',
     marginBottom: 8,
   },
   typeOptions: {
@@ -744,9 +770,10 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#444',
     marginRight: 10,
     marginBottom: 10,
+    backgroundColor: '#3a3a3a',
   },
   selectedTypeOption: {
     backgroundColor: '#D4AF37',
@@ -754,10 +781,10 @@ const styles = StyleSheet.create({
   },
   typeOptionText: {
     fontSize: 14,
-    color: '#333',
+    color: '#ffffff',
   },
   selectedTypeOptionText: {
-    color: 'white',
+    color: '#1a1a1a',
     fontWeight: '500',
   },
   modalButtons: {
@@ -772,7 +799,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cancelButton: {
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#444',
     marginRight: 10,
   },
   confirmButton: {
@@ -780,12 +807,12 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
   cancelButtonText: {
-    color: '#333',
+    color: '#ffffff',
     fontSize: 16,
     fontWeight: 'bold',
   },
   confirmButtonText: {
-    color: 'white',
+    color: '#1a1a1a',
     fontSize: 16,
     fontWeight: 'bold',
   },
@@ -805,15 +832,17 @@ const styles = StyleSheet.create({
   modalInputWithUnit: {
     flex: 1,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#444',
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
+    backgroundColor: '#3a3a3a',
+    color: '#ffffff',
   },
   unitText: {
     marginLeft: 10,
     fontSize: 16,
-    color: '#333',
+    color: '#ffffff',
     fontWeight: '500',
   },
 });

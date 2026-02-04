@@ -93,7 +93,7 @@ const LoginScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#121212', // 更深的背景色
     paddingHorizontal: 20,
   },
   header: {
@@ -109,7 +109,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 16,
-    color: '#666',
+    color: '#cccccc',
   },
   form: {
     width: '100%',
@@ -119,16 +119,17 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 14,
-    color: '#333',
+    color: '#D4AF37', // 黄金色
     marginBottom: 8,
   },
   input: {
-    backgroundColor: 'white',
+    backgroundColor: '#2d2d2d', // 深色输入框
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#444',
+    color: '#ffffff',
   },
   loginButton: {
     backgroundColor: '#D4AF37', // 黄金色
@@ -136,9 +137,17 @@ const styles = StyleSheet.create({
     padding: 15,
     alignItems: 'center',
     marginTop: 10,
+    shadowColor: '#D4AF37',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   loginButtonText: {
-    color: 'white',
+    color: '#1a1a1a',
     fontSize: 16,
     fontWeight: 'bold',
   },
@@ -148,7 +157,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   registerText: {
-    color: '#666',
+    color: '#cccccc',
   },
   registerButton: {
     color: '#D4AF37', // 黄金色

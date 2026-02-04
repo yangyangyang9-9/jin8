@@ -7,6 +7,9 @@ import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../services/supabase';
 import { getCurrentUser, getProductionLineMembers } from '../services/authService';
 
+// Supabase URL
+const supabaseUrl = 'https://hxlxshzdybqkqlmmlgqf.supabase.co';
+
 const ProductionRecordScreen = ({ navigation, route }) => {
   const { lineId, lineName } = route.params;
 
@@ -191,7 +194,7 @@ const ProductionRecordScreen = ({ navigation, route }) => {
     }
   };
 
-  // 上传图片到Supabase Storage
+  // 上传图片到Edge Function
   const uploadImage = async (imageUri, recordId) => {
     try {
       setUploadingImage(true);
@@ -199,11 +202,14 @@ const ProductionRecordScreen = ({ navigation, route }) => {
       // 检查网络连接
       if (!isConnected) {
         console.error('网络连接失败，无法上传图片');
-        return null;
+        return {
+          status: 'failed',
+          error: '网络连接失败'
+        };
       }
       
-      // 生成唯一的文件名
-      const fileName = `production_${recordId}_${Date.now()}.jpg`;
+      // 生成唯一的文件名和路径
+      const photoPath = `${lineId}/${recordId}.jpg`;
       
       // 从URI中提取二进制数据
       try {
@@ -217,73 +223,73 @@ const ProductionRecordScreen = ({ navigation, route }) => {
         const maxFileSize = 5 * 1024 * 1024; // 5MB
         if (blob.size > maxFileSize) {
           console.error('图片文件过大，最大允许5MB');
-          return null;
+          return {
+            status: 'failed',
+            error: '图片文件过大，最大允许5MB'
+          };
         }
         
-        // 直接尝试上传，不检查存储桶是否存在
-        // 增加重试机制
-        let uploadAttempts = 0;
-        const maxAttempts = 3;
-        let uploadError = null;
+        // 创建FormData对象
+        const formData = new FormData();
+        formData.append('image', blob, `production_${recordId}.jpg`);
+        formData.append('path', photoPath);
         
-        while (uploadAttempts < maxAttempts) {
-          try {
-            const { error } = await supabase
-              .storage
-              .from('production-images')
-              .upload(fileName, blob, {
-                cacheControl: '3600',
-                upsert: false
-              });
-            
-            if (!error) {
-              // 上传成功
-              // 获取图片URL
-              const { data: { publicUrl } } = supabase
-                .storage
-                .from('production-images')
-                .getPublicUrl(fileName);
-              
-              return publicUrl;
-            } else {
-              uploadError = error;
-              uploadAttempts++;
-              console.error(`上传图片失败 (尝试 ${uploadAttempts}/${maxAttempts}):`, error);
-              
-              // 如果不是网络错误，直接返回
-              if (!error.message.includes('network') && !error.message.includes('Network')) {
-                break;
-              }
-              
-              // 网络错误，等待后重试
-              if (uploadAttempts < maxAttempts) {
-                await new Promise(resolve => setTimeout(resolve, 1000 * uploadAttempts));
-              }
-            }
-          } catch (attemptError) {
-            uploadError = attemptError;
-            uploadAttempts++;
-            console.error(`上传尝试失败 (${uploadAttempts}/${maxAttempts}):`, attemptError);
-            
-            // 等待后重试
-            if (uploadAttempts < maxAttempts) {
-              await new Promise(resolve => setTimeout(resolve, 1000 * uploadAttempts));
-            }
-          }
+        // 调用Edge Function
+        const edgeResponse = await fetch(`${supabaseUrl}/functions/v1/upload-photo`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${currentUser?.session?.access_token}`
+          },
+          body: formData
+        });
+        
+        if (!edgeResponse.ok) {
+          throw new Error(`Edge Function调用失败: ${edgeResponse.status}`);
         }
         
-        // 所有尝试都失败
-        if (uploadError) {
-          console.error('上传图片失败:', uploadError);
-          return null;
+        const edgeResult = await edgeResponse.json();
+        
+        if (edgeResult.success) {
+          // 上传成功，返回状态和路径
+          return {
+            status: 'success',
+            remotePath: photoPath
+          };
+        } else {
+          console.error('Edge Function上传失败:', edgeResult.error);
+          return {
+            status: 'failed',
+            error: edgeResult.error || '上传失败'
+          };
         }
       } catch (fileError) {
-        console.error('处理图片文件失败:', fileError);
-        return null;
+        console.error('处理图片失败:', fileError);
+        return {
+          status: 'failed',
+          error: '处理图片失败'
+        };
       }
     } catch (error) {
       console.error('上传图片失败:', error);
-      return null;
+      
+      // 网络错误处理模板
+      if (error instanceof TypeError) {
+        console.warn('🌐 网络异常，已进入重试队列');
+        
+        // 这里可以添加标记图片为待处理和调度重试的逻辑
+        // markPhotoAsPending(photoId);
+        // scheduleRetry(photoId);
+        
+        return {
+          status: 'pending',
+          error: '网络异常，正在重试'
+        };
+      }
+      
+      return {
+        status: 'failed',
+        error: '上传图片失败'
+      };
     } finally {
       setUploadingImage(false);
     }
@@ -326,12 +332,12 @@ const ProductionRecordScreen = ({ navigation, route }) => {
             
             // 如果有图片，上传图片
             if (record.image_uri) {
-              const imageUrl = await uploadImage(record.image_uri, data[0].id);
-              if (imageUrl) {
-                // 更新记录的图片URL
+              const uploadResult = await uploadImage(record.image_uri, data[0].id);
+              if (uploadResult && uploadResult.status === 'success' && uploadResult.remotePath) {
+                // 更新记录的图片路径
                 await supabase
                   .from('production_records')
-                  .update({ image_url: imageUrl })
+                  .update({ photo_path: uploadResult.remotePath })
                   .eq('id', data[0].id);
               }
             }
@@ -415,23 +421,26 @@ const ProductionRecordScreen = ({ navigation, route }) => {
             return;
           }
         } else {
-          // 尝试上传图片，但不阻塞记录创建
-          setProductionRecords([data[0], ...productionRecords]);
-          
-          // 异步上传图片，不影响记录创建
+          // 保存记录后，异步上传图片
           setTimeout(async () => {
-            const imageUrl = await uploadImage(selectedImage, data[0].id);
-            if (imageUrl) {
-              // 更新记录的图片URL
+            const uploadResult = await uploadImage(selectedImage, data[0].id);
+            if (uploadResult && uploadResult.status === 'success' && uploadResult.remotePath) {
+              // 更新记录的图片路径
               await supabase
                 .from('production_records')
-                .update({ image_url: imageUrl })
+                .update({ photo_path: uploadResult.remotePath })
                 .eq('id', data[0].id);
               
               // 重新获取最新数据
               fetchProductionRecords();
+            } else if (uploadResult && uploadResult.status === 'pending') {
+              // 网络异常，显示提示
+              Alert.alert('提示', '图片已保存，将在网络恢复后自动上传');
             }
           }, 1000);
+          
+          // 添加到本地状态
+          setProductionRecords([data[0], ...productionRecords]);
           
           Alert.alert('成功', '产量记录添加成功');
         }
@@ -462,9 +471,39 @@ const ProductionRecordScreen = ({ navigation, route }) => {
     }
   };
 
+  // 获取图片的Signed URL
+  const getImageSignedUrl = async (photoPath) => {
+    if (!photoPath) return null;
+    
+    try {
+      const { data, error } = await supabase.storage
+        .from('production-photos')
+        .createSignedUrl(photoPath, 60);
+      
+      if (error) {
+        console.error('获取图片Signed URL失败:', error);
+        return null;
+      }
+      
+      return data.signedUrl;
+    } catch (error) {
+      console.error('获取图片Signed URL失败:', error);
+      return null;
+    }
+  };
+
   // 查看产量记录明细
-  const handleViewRecordDetail = (record) => {
+  const handleViewRecordDetail = async (record) => {
     setSelectedRecord(record);
+    
+    // 如果有图片路径，获取Signed URL
+    if (record.photo_path) {
+      const signedUrl = await getImageSignedUrl(record.photo_path);
+      if (signedUrl) {
+        setSelectedRecord(prev => ({ ...prev, image_url: signedUrl }));
+      }
+    }
+    
     setDetailModalVisible(true);
   };
 
@@ -762,7 +801,7 @@ const ProductionRecordScreen = ({ navigation, route }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#121212',
   },
   header: {
     flexDirection: 'row',
@@ -804,7 +843,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    color: '#666',
+    color: '#cccccc',
   },
   emptyContainer: {
     flex: 1,
@@ -815,12 +854,12 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#D4AF37',
     marginBottom: 8,
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#666',
+    color: '#cccccc',
   },
   recordHeaderRight: {
     flexDirection: 'row',
@@ -856,10 +895,12 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   recordItem: {
-    backgroundColor: 'white',
+    backgroundColor: '#2d2d2d',
     marginBottom: 10,
     padding: 15,
     borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#D4AF37',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -877,7 +918,7 @@ const styles = StyleSheet.create({
   recordDate: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#ffffff',
   },
   recordQuantity: {
     fontSize: 16,
@@ -886,26 +927,26 @@ const styles = StyleSheet.create({
   },
   recordDetails: {
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    borderTopColor: '#444',
     paddingTop: 10,
   },
   recordOperator: {
     fontSize: 14,
-    color: '#666',
+    color: '#cccccc',
     marginBottom: 4,
   },
   recordNotes: {
     fontSize: 14,
-    color: '#666',
+    color: '#cccccc',
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: 'white',
+    backgroundColor: '#2d2d2d',
     borderRadius: 8,
     padding: 20,
     width: '80%',
@@ -916,14 +957,17 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 20,
     textAlign: 'center',
+    color: '#D4AF37',
   },
   modalInput: {
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#444',
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
     marginBottom: 15,
+    backgroundColor: '#3a3a3a',
+    color: '#ffffff',
   },
   modalTextArea: {
     height: 80,
@@ -940,7 +984,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cancelButton: {
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#444',
     marginRight: 10,
   },
   confirmButton: {
@@ -948,12 +992,12 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
   cancelButtonText: {
-    color: '#333',
+    color: '#ffffff',
     fontSize: 16,
     fontWeight: 'bold',
   },
   confirmButtonText: {
-    color: 'white',
+    color: '#1a1a1a',
     fontSize: 16,
     fontWeight: 'bold',
   },
@@ -967,7 +1011,7 @@ const styles = StyleSheet.create({
   imageUploadLabel: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#D4AF37',
     marginBottom: 10,
   },
   imagePickerButton: {
@@ -978,6 +1022,7 @@ const styles = StyleSheet.create({
     padding: 20,
     alignItems: 'center',
     marginBottom: 10,
+    backgroundColor: '#3a3a3a',
   },
   imagePlaceholder: {
     alignItems: 'center',
@@ -985,7 +1030,7 @@ const styles = StyleSheet.create({
   },
   imagePlaceholderText: {
     fontSize: 14,
-    color: '#999',
+    color: '#cccccc',
     marginTop: 10,
   },
   selectedImage: {
@@ -1018,12 +1063,12 @@ const styles = StyleSheet.create({
   detailLabel: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#D4AF37',
     width: 80,
   },
   detailValue: {
     fontSize: 14,
-    color: '#666',
+    color: '#cccccc',
     flex: 1,
   },
   detailImageSection: {
@@ -1032,7 +1077,7 @@ const styles = StyleSheet.create({
   detailImageLabel: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#D4AF37',
     marginBottom: 10,
   },
   detailImage: {
@@ -1042,10 +1087,10 @@ const styles = StyleSheet.create({
   },
   detailNoImage: {
     fontSize: 14,
-    color: '#999',
+    color: '#cccccc',
     padding: 20,
     textAlign: 'center',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#3a3a3a',
     borderRadius: 8,
   },
 });

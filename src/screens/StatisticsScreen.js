@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../services/supabase';
-import { getCurrentUser } from '../services/authService';
+import { getCurrentUser, getCurrentUserId, checkLinePermission } from '../services/authService';
 
 const StatisticsScreen = () => {
   // 初始化统计数据为0
@@ -52,22 +52,37 @@ const StatisticsScreen = () => {
 
     setLoading(true);
     try {
-      // 获取用户的生产线
+      // 获取用户的所有生产线（包括拥有的和加入的）
       const { data: lines, error: linesError } = await supabase
         .from('production_lines')
         .select('*')
-        .eq('owner_id', currentUser.id)
         .eq('is_active', true);
 
       if (!linesError && lines) {
-        setProductionLines(lines);
+        // 获取当前用户ID
+        const userId = await getCurrentUserId();
+        
+        // 过滤出角色为金主和线长的生产线
+        const filteredLines = [];
+        
+        for (const line of lines) {
+          // 检查用户对该生产线的角色
+          const permission = await checkLinePermission(userId, line.id);
+          
+          // 只统计角色为金主和线长的生产线
+          if (permission.role === '金主' || permission.role === '线长') {
+            filteredLines.push(line);
+          }
+        }
+        
+        setProductionLines(filteredLines);
         
         // 计算活跃生产线数量
-        const active = lines.filter(line => line.status === '启用').length;
+        const active = filteredLines.filter(line => line.status === '启用').length;
         setActiveLines(active);
 
         // 获取所有生产线的ID
-        const lineIds = lines.map(line => line.id);
+        const lineIds = filteredLines.map(line => line.id);
 
         if (lineIds.length > 0) {
           // 获取产量记录

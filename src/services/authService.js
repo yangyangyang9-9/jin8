@@ -95,7 +95,8 @@ export const login = async (username, password) => {
       name: user.name || user.username,
       accessToken,
       refreshToken,
-      expiresAt
+      expiresAt,
+      lastLogin: new Date().toISOString() // 添加最后登录时间
     };
     
     await SecureStore.setItemAsync(SESSION_KEY, JSON.stringify(session));
@@ -330,10 +331,66 @@ export const getCurrentUserId = async () => {
 export const isAuthenticated = async () => {
   try {
     const session = await SecureStore.getItemAsync(SESSION_KEY);
-    return !!session;
+    if (session) {
+      const sessionData = JSON.parse(session);
+      // 检查登录是否在39天内
+      if (sessionData.lastLogin) {
+        const lastLogin = new Date(sessionData.lastLogin);
+        const now = new Date();
+        const daysSinceLogin = (now - lastLogin) / (1000 * 60 * 60 * 24);
+        return daysSinceLogin <= 39;
+      }
+      return true;
+    }
+    return false;
   } catch (error) {
     console.error('检查登录状态失败:', error);
     return false;
+  }
+};
+
+// 自动登录
+export const autoLogin = async () => {
+  try {
+    const session = await SecureStore.getItemAsync(SESSION_KEY);
+    if (session) {
+      const sessionData = JSON.parse(session);
+      // 检查登录是否在39天内
+      if (sessionData.lastLogin) {
+        const lastLogin = new Date(sessionData.lastLogin);
+        const now = new Date();
+        const daysSinceLogin = (now - lastLogin) / (1000 * 60 * 60 * 24);
+        if (daysSinceLogin > 39) {
+          return {
+            success: false,
+            message: '登录已过期，请重新登录'
+          };
+        }
+      }
+      // 更新最后登录时间
+      sessionData.lastLogin = new Date().toISOString();
+      await SecureStore.setItemAsync(SESSION_KEY, JSON.stringify(sessionData));
+      return {
+        success: true,
+        user: {
+          id: sessionData.userId,
+          username: sessionData.username,
+          email: sessionData.email,
+          name: sessionData.name
+        },
+        offline: false
+      };
+    }
+    return {
+      success: false,
+      message: '请先登录'
+    };
+  } catch (error) {
+    console.error('自动登录失败:', error);
+    return {
+      success: false,
+      message: '自动登录失败'
+    };
   }
 };
 
@@ -524,7 +581,7 @@ export const checkAndDisableExpiredLines = async () => {
     // 在线状态：执行检查
     const now = new Date().toISOString();
     
-    // 查找所有过期且状态为启用的生产线
+    // 1. 查找所有过期且状态为启用的生产线，设置为停用
     const { data: expiredLines, error: fetchError } = await supabase
       .from('production_lines')
       .select('id')
@@ -546,6 +603,31 @@ export const checkAndDisableExpiredLines = async () => {
           .eq('id', line.id);
       }
     }
+
+    // 2. 查找所有未过期但状态不是启用的生产线，设置为启用
+    const { data: validLines, error: validLinesError } = await supabase
+      .from('production_lines')
+      .select('id')
+      .gte('expire_date', now)
+      .neq('status', '启用')
+      .eq('is_active', true);
+
+    if (validLinesError) {
+      console.error('获取未过期生产线失败:', validLinesError);
+      return;
+    }
+
+    // 启用未过期的生产线
+    if (validLines && validLines.length > 0) {
+      for (const line of validLines) {
+        await supabase
+          .from('production_lines')
+          .update({ status: '启用' })
+          .eq('id', line.id);
+      }
+    }
+
+    console.log('生产线状态检查完成');
   } catch (error) {
     console.error('检查过期生产线失败:', error);
   }
@@ -752,6 +834,47 @@ export const checkLinePermission = async (userId, lineId) => {
     return {
       hasPermission: false,
       role: null
+    };
+  }
+};
+
+// 更新生产线名称
+export const updateProductionLineName = async (lineId, newName) => {
+  try {
+    // 检查网络状态
+    const netInfo = await NetInfo.fetch();
+    
+    if (!netInfo.isConnected) {
+      // 离线状态：添加到待处理操作
+      return await addPendingAction('UPDATE_PRODUCTION_LINE', {
+        lineId,
+        data: { name: newName }
+      });
+    }
+    
+    // 在线状态：直接更新
+    const { error } = await supabase
+      .from('production_lines')
+      .update({ name: newName })
+      .eq('id', lineId);
+    
+    if (error) {
+      console.error('更新生产线名称失败:', error);
+      return {
+        success: false,
+        message: '更新生产线名称失败'
+      };
+    }
+    
+    return {
+      success: true,
+      message: '生产线名称更新成功'
+    };
+  } catch (error) {
+    console.error('更新生产线名称失败:', error);
+    return {
+      success: false,
+      message: '更新生产线名称失败'
     };
   }
 };

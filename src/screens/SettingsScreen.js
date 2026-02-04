@@ -113,7 +113,7 @@ const SettingsScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#121212', // 更深的背景色
   },
   header: {
     backgroundColor: '#D4AF37', // 黄金色
@@ -144,13 +144,23 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   settingsSection: {
-    backgroundColor: 'white',
+    backgroundColor: '#2d2d2d', // 深色卡片
     marginBottom: 15,
     marginTop: 15,
+    marginHorizontal: 10,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   sectionTitle: {
     fontSize: 14,
-    color: '#999',
+    color: '#D4AF37', // 黄金色
     paddingHorizontal: 20,
     paddingTop: 15,
     paddingBottom: 5,
@@ -161,13 +171,13 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     paddingHorizontal: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: '#444',
   },
   settingIcon: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#FFF3CD',
+    backgroundColor: 'rgba(212, 175, 55, 0.2)', // 半透明金色背景
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -175,25 +185,33 @@ const styles = StyleSheet.create({
   settingText: {
     flex: 1,
     fontSize: 16,
-    color: '#333',
+    color: '#ffffff',
   },
   settingValue: {
     fontSize: 14,
-    color: '#666',
+    color: '#cccccc',
     marginRight: 10,
   },
   contactInfo: {
     fontSize: 14,
-    color: '#666',
+    color: '#cccccc',
     marginRight: 10,
   },
   logoutButton: {
-    backgroundColor: 'white',
+    backgroundColor: '#2d2d2d', // 深色按钮
     marginHorizontal: 20,
     marginTop: 30,
     paddingVertical: 15,
     borderRadius: 8,
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   logoutButtonText: {
     fontSize: 16,
@@ -205,7 +223,7 @@ const styles = StyleSheet.create({
     marginTop: 30,
     marginBottom: 20,
     fontSize: 14,
-    color: '#999',
+    color: '#cccccc',
   },
 });
 
