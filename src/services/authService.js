@@ -393,7 +393,7 @@ export const getCurrentUser = async () => {
   }
 };
 
-// 获取用户的生产线
+// 获取用户的生产线（包括拥有的和加入的）
 export const getUserProductionLines = async (userId) => {
   try {
     // 检查网络状态
@@ -401,21 +401,72 @@ export const getUserProductionLines = async (userId) => {
     
     if (netInfo.isConnected) {
       // 在线状态：从服务器获取
-      const { data, error } = await supabase
+      
+      // 1. 查询用户拥有的生产线
+      const { data: ownedLines, error: ownedError } = await supabase
         .from('production_lines')
         .select('*')
         .eq('owner_id', userId)
         .eq('is_active', true);
 
-      if (error) {
-        console.error('获取生产线失败:', error);
+      if (ownedError) {
+        console.error('获取拥有的生产线失败:', ownedError);
+        // 继续执行，尝试获取加入的生产线
+      }
+
+      // 2. 查询用户作为成员加入的生产线
+      const { data: memberLinesData, error: memberError } = await supabase
+        .from('production_line_members')
+        .select('production_lines(*),role')
+        .eq('user_id', userId);
+
+      if (memberError) {
+        console.error('获取加入的生产线失败:', memberError);
+        // 继续执行，返回拥有的生产线
+      }
+
+      // 处理加入的生产线数据
+      const joinedLines = memberLinesData ? memberLinesData
+        .map(member => ({
+          ...member.production_lines,
+          memberRole: member.role // 添加成员角色信息
+        }))
+        .filter(line => line && line.is_active) : [];
+
+      // 合并并去重生产线
+      const allLines = [];
+      const lineIds = new Set();
+
+      // 添加拥有的生产线
+      if (ownedLines) {
+        ownedLines.forEach(line => {
+          if (!lineIds.has(line.id)) {
+            lineIds.add(line.id);
+            allLines.push({
+              ...line,
+              memberRole: '金主' // 标记为所有者（金主）
+            });
+          }
+        });
+      }
+
+      // 添加加入的生产线
+      joinedLines.forEach(line => {
+        if (!lineIds.has(line.id)) {
+          lineIds.add(line.id);
+          allLines.push(line);
+        }
+      });
+
+      if (allLines.length === 0 && (ownedError || memberError)) {
+        console.error('获取生产线失败');
         // 失败时返回缓存的数据
         return await getOfflineData('production_lines', []);
       }
 
       // 更新缓存
-      await setOfflineData('production_lines', data);
-      return data;
+      await setOfflineData('production_lines', allLines);
+      return allLines;
     } else {
       // 离线状态：返回缓存的数据
       return await getOfflineData('production_lines', []);
@@ -634,6 +685,75 @@ export const enterOfflineMode = async (session) => {
 export const showOfflineLoginBlocked = () => {
   console.log('离线登录被阻止：从未登录过');
   // 这里可以显示一个UI提示，告诉用户需要先在线登录一次
+};
+
+// 检查用户对生产线的权限
+export const checkLinePermission = async (userId, lineId) => {
+  try {
+    // 检查网络状态
+    const netInfo = await NetInfo.fetch();
+    
+    if (netInfo.isConnected) {
+      // 在线状态：从服务器检查
+      
+      // 1. 检查是否是生产线所有者
+      const { data: ownerCheck, error: ownerError } = await supabase
+        .from('production_lines')
+        .select('id')
+        .eq('id', lineId)
+        .eq('owner_id', userId)
+        .eq('is_active', true);
+
+      if (!ownerError && ownerCheck && ownerCheck.length > 0) {
+        return {
+          hasPermission: true,
+          role: '金主'
+        };
+      }
+
+      // 2. 检查是否是生产线成员
+      const { data: memberCheck, error: memberError } = await supabase
+        .from('production_line_members')
+        .select('role')
+        .eq('line_id', lineId)
+        .eq('user_id', userId);
+
+      if (!memberError && memberCheck && memberCheck.length > 0) {
+        return {
+          hasPermission: true,
+          role: memberCheck[0].role
+        };
+      }
+
+      // 无权限
+      return {
+        hasPermission: false,
+        role: null
+      };
+    } else {
+      // 离线状态：从缓存检查
+      const allLines = await getOfflineData('production_lines', []);
+      const line = allLines.find(l => l.id === lineId);
+      
+      if (line) {
+        return {
+          hasPermission: true,
+          role: line.memberRole || 'owner'
+        };
+      }
+      
+      return {
+        hasPermission: false,
+        role: null
+      };
+    }
+  } catch (error) {
+    console.error('检查权限失败:', error);
+    return {
+      hasPermission: false,
+      role: null
+    };
+  }
 };
 
 // 初始化网络状态监听

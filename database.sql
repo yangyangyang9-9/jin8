@@ -36,13 +36,11 @@ CREATE TABLE IF NOT EXISTS production_line_members (
 -- 创建生产记录表
 CREATE TABLE IF NOT EXISTS production_records (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  line_id UUID REFERENCES production_lines(id),
-  date DATE NOT NULL,
+  line_id UUID NOT NULL REFERENCES production_lines(id),
+  user_id UUID NOT NULL REFERENCES users(id),
   quantity INTEGER NOT NULL,
-  operator TEXT NOT NULL,
-  notes TEXT,
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
+  photo_path TEXT,         -- 图片在 storage 中的路径
+  created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- 创建财务记录表
