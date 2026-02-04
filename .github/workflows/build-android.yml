@@ -28,7 +28,7 @@ jobs:
         run: |
           npx expo install react-native-web react-dom @expo/metro-runtime
           npx expo export --platform web
-          npx expo build:android --type apk --non-interactive
+          CI=1 eas build --platform android --profile preview --wait
 
       - name: Find APK files
         run: find . -name "*.apk" -type f | head -20
