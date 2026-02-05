@@ -96,9 +96,23 @@ const ProductionRecordScreen = ({ navigation, route }) => {
         // 如果在线获取失败，尝试从本地存储获取
         await loadOfflineRecords();
       } else {
-        setProductionRecords(data || []);
+        // 为每条记录生成图片URL
+        const recordsWithImageUrl = await Promise.all(
+          (data || []).map(async (record) => {
+            if (record.photo_path) {
+              const imageUrl = await getImageSignedUrl(record.photo_path);
+              return {
+                ...record,
+                image_url: imageUrl
+              };
+            }
+            return record;
+          })
+        );
+        
+        setProductionRecords(recordsWithImageUrl);
         // 保存到本地，用于离线访问
-        await saveRecordsToLocal(data || []);
+        await saveRecordsToLocal(recordsWithImageUrl);
       }
     } catch (error) {
       console.error('获取产量记录失败:', error);
@@ -125,8 +139,27 @@ const ProductionRecordScreen = ({ navigation, route }) => {
       const offlineRecordsJson = await AsyncStorage.getItem(OFFLINE_RECORDS_KEY);
       const offlineRecords = offlineRecordsJson ? JSON.parse(offlineRecordsJson) : [];
 
+      // 为已同步的记录生成图片URL（如果有photo_path但没有image_url）
+      const syncedRecordsWithImageUrl = await Promise.all(
+        syncedRecords.map(async (record) => {
+          if (record.photo_path) {
+            try {
+              const imageUrl = await getImageSignedUrl(record.photo_path);
+              return {
+                ...record,
+                image_url: imageUrl
+              };
+            } catch (error) {
+              console.error('生成图片URL失败:', error);
+              return record;
+            }
+          }
+          return record;
+        })
+      );
+
       // 合并记录，离线记录优先
-      setProductionRecords([...offlineRecords, ...syncedRecords]);
+      setProductionRecords([...offlineRecords, ...syncedRecordsWithImageUrl]);
     } catch (error) {
       console.error('加载离线记录失败:', error);
       setProductionRecords([]);
@@ -363,8 +396,22 @@ const ProductionRecordScreen = ({ navigation, route }) => {
         .order('created_at', { ascending: false });
 
       if (!error && data) {
-        setProductionRecords(data);
-        await saveRecordsToLocal(data);
+        // 为每条记录生成图片URL
+        const recordsWithImageUrl = await Promise.all(
+          data.map(async (record) => {
+            if (record.photo_path) {
+              const imageUrl = await getImageSignedUrl(record.photo_path);
+              return {
+                ...record,
+                image_url: imageUrl
+              };
+            }
+            return record;
+          })
+        );
+        
+        setProductionRecords(recordsWithImageUrl);
+        await saveRecordsToLocal(recordsWithImageUrl);
       }
 
       // 显示同步成功提示
@@ -428,7 +475,7 @@ const ProductionRecordScreen = ({ navigation, route }) => {
                 .update({ photo_path: uploadResult.remotePath })
                 .eq('id', data[0].id);
               
-              // 重新获取最新数据
+              // 重新获取最新数据，确保包含image_url
               fetchProductionRecords();
             } else if (uploadResult && uploadResult.status === 'pending') {
               // 网络异常，显示提示
@@ -472,13 +519,14 @@ const ProductionRecordScreen = ({ navigation, route }) => {
     }
   };
 
-  // 获取图片的Signed URL
+  // 获取图片的URL
   const getImageSignedUrl = async (photoPath) => {
     if (!photoPath) return null;
     
     try {
-      // 直接返回公共URL，避免使用createSignedUrl
-      return `${supabaseUrl}/storage/v1/object/public/production-photos/${photoPath}`;
+      // 构建永久的公共URL，确保图片可以长期访问
+      // 这里使用公共存储桶的永久访问URL
+      return `${supabaseUrl}/storage/v1/object/public/production-photos/${encodeURIComponent(photoPath)}`;
     } catch (error) {
       console.error('获取图片URL失败:', error);
       return null;
@@ -489,11 +537,21 @@ const ProductionRecordScreen = ({ navigation, route }) => {
   const handleViewRecordDetail = async (record) => {
     setSelectedRecord(record);
     
+    // 如果已经有image_url，直接使用
+    if (record.image_url) {
+      setDetailModalVisible(true);
+      return;
+    }
+    
     // 如果有在线图片路径，获取Signed URL
     if (record.photo_path) {
-      const signedUrl = await getImageSignedUrl(record.photo_path);
-      if (signedUrl) {
-        setSelectedRecord(prev => ({ ...prev, image_url: signedUrl }));
+      try {
+        const signedUrl = await getImageSignedUrl(record.photo_path);
+        if (signedUrl) {
+          setSelectedRecord(prev => ({ ...prev, image_url: signedUrl }));
+        }
+      } catch (error) {
+        console.error('获取图片URL失败:', error);
       }
     } 
     // 如果有离线图片路径，直接使用本地URI

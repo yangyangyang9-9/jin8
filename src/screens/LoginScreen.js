@@ -1,12 +1,34 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
-import { login } from '../services/authService';
+import { login, autoLogin } from '../services/authService';
 import { CommonActions } from '@react-navigation/native';
 
 const LoginScreen = ({ navigation }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // 组件挂载时尝试自动登录
+  useEffect(() => {
+    const checkAutoLogin = async () => {
+      try {
+        const result = await autoLogin();
+        if (result.success) {
+          // 自动登录成功，导航到主页面
+          navigation.dispatch(
+            CommonActions.reset({
+              index: 0,
+              routes: [{ name: 'Main' }],
+            })
+          );
+        }
+      } catch (error) {
+        console.error('自动登录失败:', error);
+      }
+    };
+
+    checkAutoLogin();
+  }, [navigation]);
 
   const handleLogin = async () => {
     if (!username || !password) {

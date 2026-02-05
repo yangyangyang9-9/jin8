@@ -126,8 +126,27 @@ const ManagementScreen = ({ navigation }) => {
         return;
       }
 
+      // 自动将创建者添加为生产线成员，角色为"金主"
+      const lineId = data[0].id;
+      const { error: memberError } = await supabase
+        .from('production_line_members')
+        .insert({
+          line_id: lineId,
+          user_id: userId,
+          role: '金主'
+        });
+
+      if (memberError) {
+        console.error('添加金主成员失败:', memberError);
+        // 继续执行，不因为添加成员失败而中断创建流程
+      }
+
       // 更新本地状态
-      setProductionLines([...productionLines, data[0]]);
+      const newLineWithRole = {
+        ...data[0],
+        memberRole: '金主' // 标记为所有者（金主）
+      };
+      setProductionLines([...productionLines, newLineWithRole]);
       setNewLineName('');
       setModalVisible(false);
       Alert.alert('成功', `生产线创建成功，状态为${status}`);

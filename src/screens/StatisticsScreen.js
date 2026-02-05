@@ -6,23 +6,25 @@ import { getCurrentUser, getCurrentUserId, checkLinePermission } from '../servic
 
 const StatisticsScreen = () => {
   // 初始化统计数据为0
+  const [totalProfit, setTotalProfit] = useState(0);
   const [monthlyProfit, setMonthlyProfit] = useState(0);
+  const [totalIncome, setTotalIncome] = useState(0);
+  const [monthlyIncome, setMonthlyIncome] = useState(0);
+  const [totalExpense, setTotalExpense] = useState(0);
+  const [monthlyExpense, setMonthlyExpense] = useState(0);
+  const [totalProduction, setTotalProduction] = useState(0);
   const [monthlyProduction, setMonthlyProduction] = useState(0);
-  const [todayProduction, setTodayProduction] = useState(0);
-  const [yearlyProduction, setYearlyProduction] = useState(0);
-  const [activeLines, setActiveLines] = useState(0);
-  const [totalSales, setTotalSales] = useState(0);
-  const [yearlySales, setYearlySales] = useState(0);
-  const [goldSales, setGoldSales] = useState(0);
-  const [monthlyGoldSales, setMonthlyGoldSales] = useState(0);
-  const [yearlyGoldSales, setYearlyGoldSales] = useState(0);
   const [syncing, setSyncing] = useState(false);
-  const [sales, setSales] = useState([]);
-  const [goldSalesRecords, setGoldSalesRecords] = useState([]);
+  const [incomeRecords, setIncomeRecords] = useState([]);
+  const [expenseRecords, setExpenseRecords] = useState([]);
   const [productionRecords, setProductionRecords] = useState([]);
   const [productionLines, setProductionLines] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState(null);
+  const [profitByMonth, setProfitByMonth] = useState([]);
+  const [incomeByMonth, setIncomeByMonth] = useState([]);
+  const [expenseByMonth, setExpenseByMonth] = useState([]);
+  const [productionByMonth, setProductionByMonth] = useState([]);
   
   // 模态框状态
   const [modalVisible, setModalVisible] = useState(false);
@@ -41,10 +43,6 @@ const StatisticsScreen = () => {
 
     fetchCurrentUser();
   }, []);
-  
-
-  
-
 
   // 从数据库获取实际数据
   const fetchData = async () => {
@@ -76,10 +74,6 @@ const StatisticsScreen = () => {
         }
         
         setProductionLines(filteredLines);
-        
-        // 计算活跃生产线数量
-        const active = filteredLines.filter(line => line.status === '启用').length;
-        setActiveLines(active);
 
         // 获取所有生产线的ID
         const lineIds = filteredLines.map(line => line.id);
@@ -108,95 +102,171 @@ const StatisticsScreen = () => {
             
             setMonthlyProduction(monthlyProduction);
 
-            // 计算今日产量
-            const today = new Date().toISOString().split('T')[0];
-            const todayProduction = production
-              .filter(record => record.date === today)
+            // 计算总产量
+            const totalProduction = production
               .reduce((sum, record) => sum + (record.quantity || 0), 0);
             
-            setTodayProduction(todayProduction);
+            setTotalProduction(totalProduction);
 
-            // 计算年产量
-            const yearlyProduction = production
-              .filter(record => {
-                const recordDate = new Date(record.date);
-                return recordDate.getFullYear() === currentYear;
-              })
-              .reduce((sum, record) => sum + (record.quantity || 0), 0);
+            // 按月份计算产量
+            const productionByMonth = {};
+            production.forEach(record => {
+              const recordDate = new Date(record.date);
+              const monthKey = `${recordDate.getFullYear()}-${String(recordDate.getMonth() + 1).padStart(2, '0')}`;
+              if (!productionByMonth[monthKey]) {
+                productionByMonth[monthKey] = 0;
+              }
+              productionByMonth[monthKey] += (record.quantity || 0);
+            });
             
-            setYearlyProduction(yearlyProduction);
+            const productionByMonthArray = Object.entries(productionByMonth)
+              .map(([month, quantity]) => ({
+                month,
+                quantity
+              }))
+              .sort((a, b) => a.month.localeCompare(b.month));
+            
+            setProductionByMonth(productionByMonthArray);
           }
 
-          // 获取财务记录（销售）
-          const { data: financials, error: financialsError } = await supabase
+          // 获取财务记录（收入）
+          const { data: income, error: incomeError } = await supabase
             .from('financial_records')
             .select('*')
             .in('line_id', lineIds)
             .eq('type', '收入');
 
-          if (!financialsError && financials) {
-            setSales(financials);
+          if (!incomeError && income) {
+            setIncomeRecords(income);
             
-            // 过滤出黄金销售记录
-            const goldSalesRecords = financials.filter(record => 
-              record.category && record.category.includes('黄金')
-            );
-            setGoldSalesRecords(goldSalesRecords);
-            
-            // 计算本月收益
+            // 计算本月收入
             const now = new Date();
             const currentMonth = now.getMonth();
             const currentYear = now.getFullYear();
             
-            const monthlyProfit = financials
+            const monthlyIncome = income
               .filter(record => {
                 const recordDate = new Date(record.date);
                 return recordDate.getMonth() === currentMonth && recordDate.getFullYear() === currentYear;
               })
               .reduce((sum, record) => sum + record.amount, 0);
             
-            setMonthlyProfit(monthlyProfit);
+            setMonthlyIncome(monthlyIncome);
             
-            // 计算年销售额
-            const yearlySales = financials
-              .filter(record => {
-                const recordDate = new Date(record.date);
-                return recordDate.getFullYear() === currentYear;
-              })
+            // 计算总收入
+            const totalIncome = income
               .reduce((sum, record) => sum + record.amount, 0);
             
-            setYearlySales(yearlySales);
+            setTotalIncome(totalIncome);
+
+            // 按月份计算收入
+            const incomeByMonth = {};
+            income.forEach(record => {
+              const recordDate = new Date(record.date);
+              const monthKey = `${recordDate.getFullYear()}-${String(recordDate.getMonth() + 1).padStart(2, '0')}`;
+              if (!incomeByMonth[monthKey]) {
+                incomeByMonth[monthKey] = 0;
+              }
+              incomeByMonth[monthKey] += record.amount;
+            });
             
-            // 计算总销售额
-            const totalSales = financials
-              .reduce((sum, record) => sum + record.amount, 0);
+            const incomeByMonthArray = Object.entries(incomeByMonth)
+              .map(([month, amount]) => ({
+                month,
+                amount
+              }))
+              .sort((a, b) => a.month.localeCompare(b.month));
             
-            setTotalSales(totalSales);
-            
-            // 计算黄金销售数据
-            // 总黄金销售额
-            const totalGoldSales = goldSalesRecords
-              .reduce((sum, record) => sum + record.amount, 0);
-            setGoldSales(totalGoldSales);
-            
-            // 本月黄金销售额
-            const monthlyGoldSales = goldSalesRecords
-              .filter(record => {
-                const recordDate = new Date(record.date);
-                return recordDate.getMonth() === currentMonth && recordDate.getFullYear() === currentYear;
-              })
-              .reduce((sum, record) => sum + record.amount, 0);
-            setMonthlyGoldSales(monthlyGoldSales);
-            
-            // 今年黄金销售额
-            const yearlyGoldSales = goldSalesRecords
-              .filter(record => {
-                const recordDate = new Date(record.date);
-                return recordDate.getFullYear() === currentYear;
-              })
-              .reduce((sum, record) => sum + record.amount, 0);
-            setYearlyGoldSales(yearlyGoldSales);
+            setIncomeByMonth(incomeByMonthArray);
           }
+
+          // 获取财务记录（支出）
+          const { data: expense, error: expenseError } = await supabase
+            .from('financial_records')
+            .select('*')
+            .in('line_id', lineIds)
+            .eq('type', '支出');
+
+          if (!expenseError && expense) {
+            setExpenseRecords(expense);
+            
+            // 计算本月支出
+            const now = new Date();
+            const currentMonth = now.getMonth();
+            const currentYear = now.getFullYear();
+            
+            const monthlyExpense = expense
+              .filter(record => {
+                const recordDate = new Date(record.date);
+                return recordDate.getMonth() === currentMonth && recordDate.getFullYear() === currentYear;
+              })
+              .reduce((sum, record) => sum + record.amount, 0);
+            
+            setMonthlyExpense(monthlyExpense);
+            
+            // 计算总支出
+            const totalExpense = expense
+              .reduce((sum, record) => sum + record.amount, 0);
+            
+            setTotalExpense(totalExpense);
+
+            // 按月份计算支出
+            const expenseByMonth = {};
+            expense.forEach(record => {
+              const recordDate = new Date(record.date);
+              const monthKey = `${recordDate.getFullYear()}-${String(recordDate.getMonth() + 1).padStart(2, '0')}`;
+              if (!expenseByMonth[monthKey]) {
+                expenseByMonth[monthKey] = 0;
+              }
+              expenseByMonth[monthKey] += record.amount;
+            });
+            
+            const expenseByMonthArray = Object.entries(expenseByMonth)
+              .map(([month, amount]) => ({
+                month,
+                amount
+              }))
+              .sort((a, b) => a.month.localeCompare(b.month));
+            
+            setExpenseByMonth(expenseByMonthArray);
+          }
+
+          // 计算总净利和本月净利
+          const now = new Date();
+          const currentMonth = now.getMonth();
+          const currentYear = now.getFullYear();
+          
+          // 计算本月净利
+          const monthlyProfit = monthlyIncome - monthlyExpense;
+          setMonthlyProfit(monthlyProfit);
+          
+          // 计算总净利
+          const totalProfit = totalIncome - totalExpense;
+          setTotalProfit(totalProfit);
+
+          // 按月份计算净利
+          const profitByMonth = {};
+          
+          // 合并收入和支出数据
+          const allMonths = new Set([
+            ...incomeByMonth.map(item => item.month),
+            ...expenseByMonth.map(item => item.month)
+          ]);
+          
+          allMonths.forEach(month => {
+            const incomeAmount = incomeByMonth.find(item => item.month === month)?.amount || 0;
+            const expenseAmount = expenseByMonth.find(item => item.month === month)?.amount || 0;
+            profitByMonth[month] = incomeAmount - expenseAmount;
+          });
+          
+          const profitByMonthArray = Object.entries(profitByMonth)
+            .map(([month, amount]) => ({
+              month,
+              amount
+            }))
+            .sort((a, b) => a.month.localeCompare(b.month));
+          
+          setProfitByMonth(profitByMonthArray);
         }
       }
     } catch (error) {
@@ -240,35 +310,154 @@ const StatisticsScreen = () => {
     const currentYear = now.getFullYear();
     
     switch (type) {
+      case 'totalProfit':
+        setModalTitle('总净利明细（按月）');
+        setModalType('profit_by_month');
+        setModalData(profitByMonth);
+        break;
       case 'monthlyProfit':
-        setModalTitle('本月收益明细（按生产线）');
+        setModalTitle('本月净利明细（按生产线）');
         setModalType('profit_by_line');
-        // 过滤出本月的销售记录
-        const monthlySales = sales.filter(sale => {
-          const saleDate = new Date(sale.date);
-          return saleDate.getMonth() === currentMonth && saleDate.getFullYear() === currentYear;
+        // 过滤出本月的收入和支出记录
+        const monthlyIncomeRecords = incomeRecords.filter(record => {
+          const recordDate = new Date(record.date);
+          return recordDate.getMonth() === currentMonth && recordDate.getFullYear() === currentYear;
         });
+        
+        const monthlyExpenseRecords = expenseRecords.filter(record => {
+          const recordDate = new Date(record.date);
+          return recordDate.getMonth() === currentMonth && recordDate.getFullYear() === currentYear;
+        });
+        
+        // 按生产线分组计算净利
+        const profitByLine = {};
+        
+        // 先处理收入
+        monthlyIncomeRecords.forEach(record => {
+          const lineId = record.line_id;
+          if (!profitByLine[lineId]) {
+            profitByLine[lineId] = {
+              income: 0,
+              expense: 0,
+              incomeRecords: [],
+              expenseRecords: []
+            };
+          }
+          profitByLine[lineId].income += record.amount;
+          profitByLine[lineId].incomeRecords.push(record);
+        });
+        
+        // 再处理支出
+        monthlyExpenseRecords.forEach(record => {
+          const lineId = record.line_id;
+          if (!profitByLine[lineId]) {
+            profitByLine[lineId] = {
+              income: 0,
+              expense: 0,
+              incomeRecords: [],
+              expenseRecords: []
+            };
+          }
+          profitByLine[lineId].expense += record.amount;
+          profitByLine[lineId].expenseRecords.push(record);
+        });
+        
+        // 转换为数组
+        const profitByLineArray = Object.entries(profitByLine).map(([lineId, data]) => {
+          const line = productionLines.find(l => l.id === lineId);
+          return {
+            lineId,
+            lineName: line ? line.name : '未知生产线',
+            income: data.income,
+            expense: data.expense,
+            profit: data.income - data.expense,
+            incomeRecords: data.incomeRecords,
+            expenseRecords: data.expenseRecords
+          };
+        });
+        
+        setModalData(profitByLineArray);
+        break;
+      case 'totalIncome':
+        setModalTitle('总收入明细（按月）');
+        setModalType('income_by_month');
+        setModalData(incomeByMonth);
+        break;
+      case 'monthlyIncome':
+        setModalTitle('本月收入明细（按生产线）');
+        setModalType('income_by_line');
+        // 过滤出本月的收入记录
+        const monthlyIncomeByLine = incomeRecords.filter(record => {
+          const recordDate = new Date(record.date);
+          return recordDate.getMonth() === currentMonth && recordDate.getFullYear() === currentYear;
+        });
+        
         // 按生产线分组
-        const profitByLine = monthlySales.reduce((groups, sale) => {
-          const lineId = sale.line_id;
+        const incomeByLine = monthlyIncomeByLine.reduce((groups, record) => {
+          const lineId = record.line_id;
           if (!groups[lineId]) {
             groups[lineId] = [];
           }
-          groups[lineId].push(sale);
+          groups[lineId].push(record);
           return groups;
         }, {});
-        // 转换为数组并计算每条生产线的总收益
-        const profitByLineArray = Object.entries(profitByLine).map(([lineId, sales]) => {
+        
+        // 转换为数组
+        const incomeByLineArray = Object.entries(incomeByLine).map(([lineId, records]) => {
           const line = productionLines.find(l => l.id === lineId);
-          const totalAmount = sales.reduce((sum, sale) => sum + sale.amount, 0);
+          const totalAmount = records.reduce((sum, record) => sum + record.amount, 0);
           return {
             lineId,
             lineName: line ? line.name : '未知生产线',
             totalAmount,
-            sales
+            records
           };
         });
-        setModalData(profitByLineArray);
+        
+        setModalData(incomeByLineArray);
+        break;
+      case 'totalExpense':
+        setModalTitle('总支出明细（按月）');
+        setModalType('expense_by_month');
+        setModalData(expenseByMonth);
+        break;
+      case 'monthlyExpense':
+        setModalTitle('本月支出明细（按生产线）');
+        setModalType('expense_by_line');
+        // 过滤出本月的支出记录
+        const monthlyExpenseByLine = expenseRecords.filter(record => {
+          const recordDate = new Date(record.date);
+          return recordDate.getMonth() === currentMonth && recordDate.getFullYear() === currentYear;
+        });
+        
+        // 按生产线分组
+        const expenseByLine = monthlyExpenseByLine.reduce((groups, record) => {
+          const lineId = record.line_id;
+          if (!groups[lineId]) {
+            groups[lineId] = [];
+          }
+          groups[lineId].push(record);
+          return groups;
+        }, {});
+        
+        // 转换为数组
+        const expenseByLineArray = Object.entries(expenseByLine).map(([lineId, records]) => {
+          const line = productionLines.find(l => l.id === lineId);
+          const totalAmount = records.reduce((sum, record) => sum + record.amount, 0);
+          return {
+            lineId,
+            lineName: line ? line.name : '未知生产线',
+            totalAmount,
+            records
+          };
+        });
+        
+        setModalData(expenseByLineArray);
+        break;
+      case 'totalProduction':
+        setModalTitle('总产量明细（按月）');
+        setModalType('production_by_month');
+        setModalData(productionByMonth);
         break;
       case 'monthlyProduction':
         setModalTitle('本月产量明细（按生产线）');
@@ -300,149 +489,6 @@ const StatisticsScreen = () => {
         });
         setModalData(productionByLineArray);
         break;
-      case 'todayProduction':
-        setModalTitle('今日产量明细（按生产线）');
-        setModalType('production_by_line');
-        // 过滤出今日的产量记录
-        const today = new Date().toISOString().split('T')[0];
-        const todayRecords = productionRecords.filter(record => record.date === today);
-        // 按生产线分组
-        const todayByLine = todayRecords.reduce((groups, record) => {
-          const lineId = record.line_id;
-          if (!groups[lineId]) {
-            groups[lineId] = [];
-          }
-          groups[lineId].push(record);
-          return groups;
-        }, {});
-        // 转换为数组并计算每条生产线的总产量
-        const todayByLineArray = Object.entries(todayByLine).map(([lineId, records]) => {
-          const line = productionLines.find(l => l.id === lineId);
-          const totalQuantity = records.reduce((sum, record) => sum + (record.quantity || 0), 0);
-          return {
-            lineId,
-            lineName: line ? line.name : '未知生产线',
-            totalQuantity,
-            records
-          };
-        });
-        setModalData(todayByLineArray);
-        break;
-      case 'yearlyProduction':
-        setModalTitle('今年产量明细（按生产线）');
-        setModalType('production_by_line');
-        // 过滤出今年的产量记录
-        const yearlyRecords = productionRecords.filter(record => {
-          const recordDate = new Date(record.date);
-          return recordDate.getFullYear() === currentYear;
-        });
-        // 按生产线分组
-        const yearlyByLine = yearlyRecords.reduce((groups, record) => {
-          const lineId = record.line_id;
-          if (!groups[lineId]) {
-            groups[lineId] = [];
-          }
-          groups[lineId].push(record);
-          return groups;
-        }, {});
-        // 转换为数组并计算每条生产线的总产量
-        const yearlyByLineArray = Object.entries(yearlyByLine).map(([lineId, records]) => {
-          const line = productionLines.find(l => l.id === lineId);
-          const totalQuantity = records.reduce((sum, record) => sum + (record.quantity || 0), 0);
-          return {
-            lineId,
-            lineName: line ? line.name : '未知生产线',
-            totalQuantity,
-            records
-          };
-        });
-        setModalData(yearlyByLineArray);
-        break;
-      case 'goldSales':
-        setModalTitle('总黄金销售额明细（按生产线）');
-        setModalType('profit_by_line');
-        // 按生产线分组黄金销售记录
-        const goldByLine = goldSalesRecords.reduce((groups, sale) => {
-          const lineId = sale.line_id;
-          if (!groups[lineId]) {
-            groups[lineId] = [];
-          }
-          groups[lineId].push(sale);
-          return groups;
-        }, {});
-        // 转换为数组并计算每条生产线的总黄金销售额
-        const goldByLineArray = Object.entries(goldByLine).map(([lineId, sales]) => {
-          const line = productionLines.find(l => l.id === lineId);
-          const totalAmount = sales.reduce((sum, sale) => sum + sale.amount, 0);
-          return {
-            lineId,
-            lineName: line ? line.name : '未知生产线',
-            totalAmount,
-            sales
-          };
-        });
-        setModalData(goldByLineArray);
-        break;
-      case 'monthlyGoldSales':
-        setModalTitle('本月黄金销售额明细（按生产线）');
-        setModalType('profit_by_line');
-        // 过滤出本月的黄金销售记录
-        const monthlyGoldSalesRecords = goldSalesRecords.filter(sale => {
-          const saleDate = new Date(sale.date);
-          return saleDate.getMonth() === currentMonth && saleDate.getFullYear() === currentYear;
-        });
-        // 按生产线分组
-        const monthlyGoldByLine = monthlyGoldSalesRecords.reduce((groups, sale) => {
-          const lineId = sale.line_id;
-          if (!groups[lineId]) {
-            groups[lineId] = [];
-          }
-          groups[lineId].push(sale);
-          return groups;
-        }, {});
-        // 转换为数组并计算每条生产线的总黄金销售额
-        const monthlyGoldByLineArray = Object.entries(monthlyGoldByLine).map(([lineId, sales]) => {
-          const line = productionLines.find(l => l.id === lineId);
-          const totalAmount = sales.reduce((sum, sale) => sum + sale.amount, 0);
-          return {
-            lineId,
-            lineName: line ? line.name : '未知生产线',
-            totalAmount,
-            sales
-          };
-        });
-        setModalData(monthlyGoldByLineArray);
-        break;
-      case 'yearlyGoldSales':
-        setModalTitle('今年黄金销售额明细（按生产线）');
-        setModalType('profit_by_line');
-        // 过滤出今年的黄金销售记录
-        const yearlyGoldSalesRecords = goldSalesRecords.filter(sale => {
-          const saleDate = new Date(sale.date);
-          return saleDate.getFullYear() === currentYear;
-        });
-        // 按生产线分组
-        const yearlyGoldByLine = yearlyGoldSalesRecords.reduce((groups, sale) => {
-          const lineId = sale.line_id;
-          if (!groups[lineId]) {
-            groups[lineId] = [];
-          }
-          groups[lineId].push(sale);
-          return groups;
-        }, {});
-        // 转换为数组并计算每条生产线的总黄金销售额
-        const yearlyGoldByLineArray = Object.entries(yearlyGoldByLine).map(([lineId, sales]) => {
-          const line = productionLines.find(l => l.id === lineId);
-          const totalAmount = sales.reduce((sum, sale) => sum + sale.amount, 0);
-          return {
-            lineId,
-            lineName: line ? line.name : '未知生产线',
-            totalAmount,
-            sales
-          };
-        });
-        setModalData(yearlyGoldByLineArray);
-        break;
     }
     setModalVisible(true);
   };
@@ -462,11 +508,65 @@ const StatisticsScreen = () => {
           <View style={styles.statsContainer}>
             <TouchableOpacity 
               style={styles.statCard}
+              onPress={() => handleStatCardPress('totalProfit')}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.statValue}>¥{totalProfit.toFixed(2)}</Text>
+              <Text style={styles.statLabel}>总净利(元)</Text>
+              <Ionicons name="chevron-forward" size={16} color="#999" style={styles.statIcon} />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.statCard}
               onPress={() => handleStatCardPress('monthlyProfit')}
               activeOpacity={0.7}
             >
               <Text style={styles.statValue}>¥{monthlyProfit.toFixed(2)}</Text>
-              <Text style={styles.statLabel}>本月收益(元)</Text>
+              <Text style={styles.statLabel}>本月净利(元)</Text>
+              <Ionicons name="chevron-forward" size={16} color="#999" style={styles.statIcon} />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.statCard}
+              onPress={() => handleStatCardPress('totalIncome')}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.statValue}>¥{totalIncome.toFixed(2)}</Text>
+              <Text style={styles.statLabel}>总收入(元)</Text>
+              <Ionicons name="chevron-forward" size={16} color="#999" style={styles.statIcon} />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.statCard}
+              onPress={() => handleStatCardPress('monthlyIncome')}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.statValue}>¥{monthlyIncome.toFixed(2)}</Text>
+              <Text style={styles.statLabel}>本月收入(元)</Text>
+              <Ionicons name="chevron-forward" size={16} color="#999" style={styles.statIcon} />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.statCard}
+              onPress={() => handleStatCardPress('totalExpense')}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.statValue}>¥{totalExpense.toFixed(2)}</Text>
+              <Text style={styles.statLabel}>总支出(元)</Text>
+              <Ionicons name="chevron-forward" size={16} color="#999" style={styles.statIcon} />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.statCard}
+              onPress={() => handleStatCardPress('monthlyExpense')}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.statValue}>¥{monthlyExpense.toFixed(2)}</Text>
+              <Text style={styles.statLabel}>本月支出(元)</Text>
+              <Ionicons name="chevron-forward" size={16} color="#999" style={styles.statIcon} />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.statCard}
+              onPress={() => handleStatCardPress('totalProduction')}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.statValue}>{totalProduction}</Text>
+              <Text style={styles.statLabel}>总产量(g)</Text>
               <Ionicons name="chevron-forward" size={16} color="#999" style={styles.statIcon} />
             </TouchableOpacity>
             <TouchableOpacity 
@@ -478,58 +578,6 @@ const StatisticsScreen = () => {
               <Text style={styles.statLabel}>本月产量(g)</Text>
               <Ionicons name="chevron-forward" size={16} color="#999" style={styles.statIcon} />
             </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.statCard}
-              onPress={() => handleStatCardPress('todayProduction')}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.statValue}>{todayProduction}</Text>
-              <Text style={styles.statLabel}>今日产量(g)</Text>
-              <Ionicons name="chevron-forward" size={16} color="#999" style={styles.statIcon} />
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.statCard}
-              onPress={() => handleStatCardPress('yearlyProduction')}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.statValue}>{yearlyProduction}</Text>
-              <Text style={styles.statLabel}>今年产量(g)</Text>
-              <Ionicons name="chevron-forward" size={16} color="#999" style={styles.statIcon} />
-            </TouchableOpacity>
-          </View>
-          
-          {/* 黄金销售额统计模块 */}
-          <View style={styles.goldSalesSection}>
-            <Text style={styles.sectionTitle}>黄金销售额统计</Text>
-            <View style={styles.goldStatsContainer}>
-              <TouchableOpacity 
-                style={styles.statCard}
-                onPress={() => handleStatCardPress('goldSales')}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.statValue}>¥{goldSales.toFixed(2)}</Text>
-                <Text style={styles.statLabel}>总黄金销售额(元)</Text>
-                <Ionicons name="chevron-forward" size={16} color="#999" style={styles.statIcon} />
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.statCard}
-                onPress={() => handleStatCardPress('monthlyGoldSales')}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.statValue}>¥{monthlyGoldSales.toFixed(2)}</Text>
-                <Text style={styles.statLabel}>本月黄金销售额(元)</Text>
-                <Ionicons name="chevron-forward" size={16} color="#999" style={styles.statIcon} />
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.statCard}
-                onPress={() => handleStatCardPress('yearlyGoldSales')}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.statValue}>¥{yearlyGoldSales.toFixed(2)}</Text>
-                <Text style={styles.statLabel}>今年黄金销售额(元)</Text>
-                <Ionicons name="chevron-forward" size={16} color="#999" style={styles.statIcon} />
-              </TouchableOpacity>
-            </View>
           </View>
           
           {/* 同步数据按钮 */}
@@ -567,7 +615,7 @@ const StatisticsScreen = () => {
                 style={styles.closeButton}
                 onPress={() => setModalVisible(false)}
               >
-                <Ionicons name="close" size={24} color="#333" />
+                <Ionicons name="close" size={24} color="red" />
               </TouchableOpacity>
             </View>
             <ScrollView style={styles.modalBody}>
@@ -575,21 +623,121 @@ const StatisticsScreen = () => {
               <View style={styles.emptyContainer}>
                 <Text style={styles.emptyText}>暂无明细数据</Text>
               </View>
+            ) : modalType === 'profit_by_month' ? (
+              modalData.map((item, index) => (
+                <View key={index} style={styles.modalItem}>
+                  <View style={styles.modalItemLeft}>
+                    <Text style={styles.modalItemDate}>{item.month}</Text>
+                  </View>
+                  <Text style={[styles.modalItemAmount, item.amount < 0 ? styles.negativeAmount : {}]}>
+                    {item.amount >= 0 ? '+' : ''}¥{item.amount.toFixed(2)}
+                  </Text>
+                </View>
+              ))
+            ) : modalType === 'income_by_month' ? (
+              modalData.map((item, index) => (
+                <View key={index} style={styles.modalItem}>
+                  <View style={styles.modalItemLeft}>
+                    <Text style={styles.modalItemDate}>{item.month}</Text>
+                  </View>
+                  <Text style={styles.modalItemAmount}>¥{item.amount.toFixed(2)}</Text>
+                </View>
+              ))
+            ) : modalType === 'expense_by_month' ? (
+              modalData.map((item, index) => (
+                <View key={index} style={styles.modalItem}>
+                  <View style={styles.modalItemLeft}>
+                    <Text style={styles.modalItemDate}>{item.month}</Text>
+                  </View>
+                  <Text style={styles.negativeAmount}>¥{item.amount.toFixed(2)}</Text>
+                </View>
+              ))
+            ) : modalType === 'production_by_month' ? (
+              modalData.map((item, index) => (
+                <View key={index} style={styles.modalItem}>
+                  <View style={styles.modalItemLeft}>
+                    <Text style={styles.modalItemDate}>{item.month}</Text>
+                  </View>
+                  <Text style={styles.modalItemQuantity}>{item.quantity} g</Text>
+                </View>
+              ))
             ) : modalType === 'profit_by_line' ? (
               modalData.map((lineItem, lineIndex) => (
                 <View key={lineIndex} style={styles.groupedItem}>
                   <View style={styles.groupHeader}>
                     <Text style={styles.groupDate}>{lineItem.lineName}</Text>
-                    <Text style={styles.groupTotal}>总金额: ¥{lineItem.totalAmount.toFixed(2)}</Text>
+                    <Text style={[styles.groupTotal, lineItem.profit < 0 ? styles.negativeAmount : {}]}>
+                      净利: {lineItem.profit >= 0 ? '+' : ''}¥{lineItem.profit.toFixed(2)}
+                    </Text>
                   </View>
                   <View style={styles.groupContent}>
-                    {lineItem.sales.map((sale, saleIndex) => (
-                      <View key={sale.id || saleIndex} style={styles.subItem}>
-                        <View style={styles.subItemLeft}>
-                          <Text style={styles.subItemDate}>{sale.date}</Text>
-                          <Text style={styles.subItemDescription}>{sale.description || '销售记录'}</Text>
+                    <Text style={styles.subItemSectionTitle}>收入明细:</Text>
+                    {lineItem.incomeRecords.length > 0 ? (
+                      lineItem.incomeRecords.map((record, recordIndex) => (
+                        <View key={record.id || recordIndex} style={styles.subItem}>
+                          <View style={styles.subItemLeft}>
+                            <Text style={styles.subItemDate}>{record.date}</Text>
+                            <Text style={styles.subItemDescription}>{record.description || '收入记录'}</Text>
+                          </View>
+                          <Text style={styles.subItemAmount}>+¥{record.amount.toFixed(2)}</Text>
                         </View>
-                        <Text style={styles.subItemAmount}>¥{sale.amount}</Text>
+                      ))
+                    ) : (
+                      <Text style={styles.noDataText}>无收入记录</Text>
+                    )}
+                    
+                    <Text style={[styles.subItemSectionTitle, { marginTop: 15 }]}>支出明细:</Text>
+                    {lineItem.expenseRecords.length > 0 ? (
+                      lineItem.expenseRecords.map((record, recordIndex) => (
+                        <View key={record.id || recordIndex} style={styles.subItem}>
+                          <View style={styles.subItemLeft}>
+                            <Text style={styles.subItemDate}>{record.date}</Text>
+                            <Text style={styles.subItemDescription}>{record.description || '支出记录'}</Text>
+                          </View>
+                          <Text style={styles.negativeAmount}>-¥{record.amount.toFixed(2)}</Text>
+                        </View>
+                      ))
+                    ) : (
+                      <Text style={styles.noDataText}>无支出记录</Text>
+                    )}
+                  </View>
+                </View>
+              ))
+            ) : modalType === 'income_by_line' ? (
+              modalData.map((lineItem, lineIndex) => (
+                <View key={lineIndex} style={styles.groupedItem}>
+                  <View style={styles.groupHeader}>
+                    <Text style={styles.groupDate}>{lineItem.lineName}</Text>
+                    <Text style={styles.groupTotal}>总收入: ¥{lineItem.totalAmount.toFixed(2)}</Text>
+                  </View>
+                  <View style={styles.groupContent}>
+                    {lineItem.records.map((record, recordIndex) => (
+                      <View key={record.id || recordIndex} style={styles.subItem}>
+                        <View style={styles.subItemLeft}>
+                          <Text style={styles.subItemDate}>{record.date}</Text>
+                          <Text style={styles.subItemDescription}>{record.description || '收入记录'}</Text>
+                        </View>
+                        <Text style={styles.subItemAmount}>¥{record.amount.toFixed(2)}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              ))
+            ) : modalType === 'expense_by_line' ? (
+              modalData.map((lineItem, lineIndex) => (
+                <View key={lineIndex} style={styles.groupedItem}>
+                  <View style={styles.groupHeader}>
+                    <Text style={styles.groupDate}>{lineItem.lineName}</Text>
+                    <Text style={styles.groupTotal}>总支出: ¥{lineItem.totalAmount.toFixed(2)}</Text>
+                  </View>
+                  <View style={styles.groupContent}>
+                    {lineItem.records.map((record, recordIndex) => (
+                      <View key={record.id || recordIndex} style={styles.subItem}>
+                        <View style={styles.subItemLeft}>
+                          <Text style={styles.subItemDate}>{record.date}</Text>
+                          <Text style={styles.subItemDescription}>{record.description || '支出记录'}</Text>
+                        </View>
+                        <Text style={styles.negativeAmount}>¥{record.amount.toFixed(2)}</Text>
                       </View>
                     ))}
                   </View>
@@ -612,79 +760,6 @@ const StatisticsScreen = () => {
                         <Text style={styles.subItemQuantity}>{record.quantity} g</Text>
                       </View>
                     ))}
-                  </View>
-                </View>
-              ))
-            ) : modalType === 'profit' ? (
-              modalData.map((item, index) => (
-                <View key={item.id || index} style={styles.modalItem}>
-                  <View style={styles.modalItemLeft}>
-                    <Text style={styles.modalItemDate}>{item.date}</Text>
-                    <Text style={styles.modalItemDescription}>{item.description || '销售记录'}</Text>
-                  </View>
-                  <Text style={styles.modalItemAmount}>+¥{item.amount}</Text>
-                </View>
-              ))
-            ) : modalType === 'production' ? (
-              modalData.map((item, index) => (
-                <View key={item.id || index} style={styles.modalItem}>
-                  <View style={styles.modalItemLeft}>
-                    <Text style={styles.modalItemDate}>{item.date}</Text>
-                    <Text style={styles.modalItemOperator}>操作人: {item.operator || '未知'}</Text>
-                  </View>
-                  <Text style={styles.modalItemQuantity}>{item.quantity} g</Text>
-                </View>
-              ))
-            ) : modalType === 'production_by_day' ? (
-              modalData.map((dayItem, dayIndex) => (
-                <View key={dayIndex} style={styles.groupedItem}>
-                  <View style={styles.groupHeader}>
-                    <Text style={styles.groupDate}>{dayItem.date}</Text>
-                    <Text style={styles.groupTotal}>总产量: {dayItem.totalQuantity} g</Text>
-                  </View>
-                  <View style={styles.groupContent}>
-                    {dayItem.records.map((record, recordIndex) => (
-                      <View key={record.id || recordIndex} style={styles.subItem}>
-                        <View style={styles.subItemLeft}>
-                          <Text style={styles.subItemOperator}>操作人: {record.operator || '未知'}</Text>
-                        </View>
-                        <Text style={styles.subItemQuantity}>{record.quantity} g</Text>
-                      </View>
-                    ))}
-                  </View>
-                </View>
-              ))
-            ) : modalType === 'production_by_month' ? (
-              modalData.map((monthItem, monthIndex) => (
-                <View key={monthIndex} style={styles.groupedItem}>
-                  <View style={styles.groupHeader}>
-                    <Text style={styles.groupDate}>{monthItem.monthName}</Text>
-                    <Text style={styles.groupTotal}>总产量: {monthItem.totalQuantity} g</Text>
-                  </View>
-                  <View style={styles.groupContent}>
-                    {monthItem.records.length > 5 ? (
-                      <Text style={styles.moreRecords}>共 {monthItem.records.length} 条记录</Text>
-                    ) : (
-                      monthItem.records.map((record, recordIndex) => (
-                        <View key={record.id || recordIndex} style={styles.subItem}>
-                          <View style={styles.subItemLeft}>
-                            <Text style={styles.subItemDate}>{record.date}</Text>
-                            <Text style={styles.subItemOperator}>操作人: {record.operator || '未知'}</Text>
-                          </View>
-                          <Text style={styles.subItemQuantity}>{record.quantity} g</Text>
-                        </View>
-                      ))
-                    )}
-                  </View>
-                </View>
-              ))
-            ) : modalType === 'lines' ? (
-              modalData.map((item, index) => (
-                <View key={item.id || index} style={styles.modalItem}>
-                  <View style={styles.modalItemLeft}>
-                    <Text style={styles.modalItemName}>{item.name}</Text>
-                    <Text style={styles.modalItemStatus}>状态: {item.status}</Text>
-                    <Text style={styles.modalItemExpire}>到期时间: {item.expire_date ? new Date(item.expire_date).toLocaleDateString() : '未知'}</Text>
                   </View>
                 </View>
               ))
@@ -979,83 +1054,24 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#cccccc',
   },
-  salesList: {
-    marginTop: 10,
-  },
-  salesItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  salesInfo: {
-    flex: 1,
-  },
-  salesDate: {
+  // 新增样式
+  negativeAmount: {
     fontSize: 14,
-    color: '#666',
-    marginBottom: 4,
+    fontWeight: '500',
+    color: '#f44336',
   },
-  salesProduct: {
-    fontSize: 16,
-    color: '#333',
-  },
-  salesAmount: {
-    fontSize: 16,
+  subItemSectionTitle: {
+    fontSize: 14,
     fontWeight: 'bold',
-    color: '#D4AF37', // 黄金色
-  },
-  chartPlaceholder: {
-    height: 200,
-    backgroundColor: '#f9f9f9',
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  placeholderText: {
-    color: '#999',
-  },
-  emptyText: {
-    textAlign: 'center',
-    color: '#999',
-    paddingVertical: 20,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 100,
-  },
-  loadingText: {
-    fontSize: 16,
-    color: '#666',
-  },
-  goldSalesSection: {
-    backgroundColor: '#1a1a1a',
-    marginBottom: 15,
-    padding: 20,
-    borderRadius: 12,
-    marginHorizontal: 10,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 15,
     color: '#D4AF37',
+    marginBottom: 10,
+    marginTop: 5,
   },
-  goldStatsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
+  noDataText: {
+    fontSize: 12,
+    color: '#999999',
+    fontStyle: 'italic',
+    paddingVertical: 5,
   },
 });
 
