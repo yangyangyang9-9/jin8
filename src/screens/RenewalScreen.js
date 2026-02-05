@@ -32,6 +32,19 @@ const RenewalScreen = ({ navigation }) => {
         </View>
 
         <View style={styles.section}>
+          <Text style={styles.sectionTitle}>优惠价格</Text>
+          <View style={styles.priceCard}>
+            <Text style={styles.priceTitle}>月付方案</Text>
+            <Text style={styles.priceValue}>¥599/月</Text>
+          </View>
+          <View style={styles.priceCard}>
+            <Text style={styles.priceTitle}>年付方案</Text>
+            <Text style={styles.priceValue}>¥5999/年</Text>
+            <Text style={styles.priceNote}>（年付更优惠，相当于每月仅需¥499）</Text>
+          </View>
+        </View>
+
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>联系方式</Text>
           <View style={styles.contactInfo}>
             <TouchableOpacity 
@@ -168,6 +181,30 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#856404',
     marginBottom: 5,
+  },
+  priceCard: {
+    backgroundColor: '#f9f9f9',
+    borderRadius: 8,
+    padding: 20,
+    marginBottom: 15,
+    width: '100%',
+    alignItems: 'center',
+  },
+  priceTitle: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 8,
+  },
+  priceValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#D4AF37',
+    marginBottom: 5,
+  },
+  priceNote: {
+    fontSize: 12,
+    color: '#999',
+    fontStyle: 'italic',
   },
 });
 

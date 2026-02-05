@@ -3,7 +3,7 @@ import * as SecureStore from 'expo-secure-store';
 
 const supabaseUrl = 'https://yogdjoisougtrgsuonbq.supabase.co';
 // 使用 Publishable key
-const supabaseKey = 'sb_publishable_eAgMSHqxVldtqAK3A2hRRg_zKR_4qR5';
+const supabaseKey = 'sb_publishable_thpUriXC_fUAmlwicqRREw_JsUBoyxV';
 
 // 创建 Supabase 客户端
 export const supabase = createClient(supabaseUrl, supabaseKey, {

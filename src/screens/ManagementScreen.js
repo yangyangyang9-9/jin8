@@ -113,7 +113,7 @@ const ManagementScreen = ({ navigation }) => {
           name: newLineName,
           owner_id: userId,
           plan: '月付',
-          price: 100.00,
+          price: 599.00,
           expire_date: expireDate,
           status: status,
           is_active: true

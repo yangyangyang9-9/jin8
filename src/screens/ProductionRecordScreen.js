@@ -8,7 +8,7 @@ import { supabase } from '../services/supabase';
 import { getCurrentUser, getProductionLineMembers } from '../services/authService';
 
 // Supabase URL
-const supabaseUrl = 'https://hxlxshzdybqkqlmmlgqf.supabase.co';
+const supabaseUrl = 'https://yogdjoisougtrgsuonbq.supabase.co';
 
 const ProductionRecordScreen = ({ navigation, route }) => {
   const { lineId, lineName } = route.params;
@@ -237,9 +237,6 @@ const ProductionRecordScreen = ({ navigation, route }) => {
         // 调用Edge Function
         const edgeResponse = await fetch(`${supabaseUrl}/functions/v1/upload-photo`, {
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${currentUser?.session?.access_token}`
-          },
           body: formData
         });
         
@@ -439,8 +436,12 @@ const ProductionRecordScreen = ({ navigation, route }) => {
             }
           }, 1000);
           
-          // 添加到本地状态
-          setProductionRecords([data[0], ...productionRecords]);
+          // 添加到本地状态，同时包含图片信息
+          const recordWithImage = {
+            ...data[0],
+            image_uri: selectedImage // 临时使用本地URI，后续会被服务器数据替换
+          };
+          setProductionRecords([recordWithImage, ...productionRecords]);
           
           Alert.alert('成功', '产量记录添加成功');
         }
@@ -476,18 +477,10 @@ const ProductionRecordScreen = ({ navigation, route }) => {
     if (!photoPath) return null;
     
     try {
-      const { data, error } = await supabase.storage
-        .from('production-photos')
-        .createSignedUrl(photoPath, 60);
-      
-      if (error) {
-        console.error('获取图片Signed URL失败:', error);
-        return null;
-      }
-      
-      return data.signedUrl;
+      // 直接返回公共URL，避免使用createSignedUrl
+      return `${supabaseUrl}/storage/v1/object/public/production-photos/${photoPath}`;
     } catch (error) {
-      console.error('获取图片Signed URL失败:', error);
+      console.error('获取图片URL失败:', error);
       return null;
     }
   };
@@ -496,12 +489,16 @@ const ProductionRecordScreen = ({ navigation, route }) => {
   const handleViewRecordDetail = async (record) => {
     setSelectedRecord(record);
     
-    // 如果有图片路径，获取Signed URL
+    // 如果有在线图片路径，获取Signed URL
     if (record.photo_path) {
       const signedUrl = await getImageSignedUrl(record.photo_path);
       if (signedUrl) {
         setSelectedRecord(prev => ({ ...prev, image_url: signedUrl }));
       }
+    } 
+    // 如果有离线图片路径，直接使用本地URI
+    else if (record.image_uri) {
+      setSelectedRecord(prev => ({ ...prev, image_url: record.image_uri }));
     }
     
     setDetailModalVisible(true);
