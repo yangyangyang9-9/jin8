@@ -70,6 +70,15 @@ export const login = async (username, password) => {
 
     const user = users[0];
     console.log('找到用户:', user.id);
+    
+    // 验证密码
+    if (!user.password || user.password !== password) {
+      console.log('密码错误');
+      return {
+        success: false,
+        message: '用户名或密码错误'
+      };
+    }
 
     // 检查并禁用过期的生产线
     await checkAndDisableExpiredLines();
@@ -210,7 +219,8 @@ export const register = async (username, password) => {
         id: userId,
         username: validUsername,
         email: email,
-        name: username
+        name: username,
+        password: password
       });
 
     if (createUserError) {
@@ -875,6 +885,84 @@ export const updateProductionLineName = async (lineId, newName) => {
     return {
       success: false,
       message: '更新生产线名称失败'
+    };
+  }
+};
+
+// 修改密码
+export const changePassword = async (currentPassword, newPassword) => {
+  try {
+    // 检查网络状态
+    const netInfo = await NetInfo.fetch();
+    
+    if (!netInfo.isConnected) {
+      // 离线状态：修改密码需要在线
+      console.log('离线状态，无法修改密码');
+      return {
+        success: false,
+        message: '修改密码需要网络连接'
+      };
+    }
+    
+    // 获取当前用户信息
+    const session = await SecureStore.getItemAsync(SESSION_KEY);
+    if (!session) {
+      return {
+        success: false,
+        message: '用户未登录'
+      };
+    }
+    
+    const sessionData = JSON.parse(session);
+    const userId = sessionData.userId;
+    
+    // 从服务器获取当前用户信息，验证当前密码
+    const { data: user, error: fetchError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', userId)
+      .single();
+    
+    if (fetchError) {
+      console.error('获取用户信息失败:', fetchError);
+      return {
+        success: false,
+        message: '获取用户信息失败'
+      };
+    }
+    
+    // 验证当前密码
+    if (user.password !== currentPassword) {
+      return {
+        success: false,
+        message: '当前密码错误'
+      };
+    }
+    
+    // 更新密码
+    const { error: updateError } = await supabase
+      .from('users')
+      .update({ password: newPassword })
+      .eq('id', userId);
+    
+    if (updateError) {
+      console.error('更新密码失败:', updateError);
+      return {
+        success: false,
+        message: '更新密码失败'
+      };
+    }
+    
+    console.log('密码修改成功');
+    return {
+      success: true,
+      message: '密码修改成功'
+    };
+  } catch (error) {
+    console.error('修改密码失败:', error);
+    return {
+      success: false,
+      message: error.message
     };
   }
 };

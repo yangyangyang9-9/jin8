@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Alert, Linking } from 'react-native';
+import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Alert, Linking, Clipboard } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 const RenewalScreen = ({ navigation }) => {
@@ -34,10 +34,16 @@ const RenewalScreen = ({ navigation }) => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>联系方式</Text>
           <View style={styles.contactInfo}>
-            <View style={styles.contactItem}>
+            <TouchableOpacity 
+              style={styles.contactItem}
+              onPress={() => {
+                Clipboard.setString('jiu11111xiao');
+                Alert.alert('成功', '微信ID已复制到剪贴板');
+              }}
+            >
               <Ionicons name="logo-wechat" size={24} color="#07C160" />
               <Text style={styles.contactText}>微信: jiu11111xiao</Text>
-            </View>
+            </TouchableOpacity>
           </View>
         </View>
 

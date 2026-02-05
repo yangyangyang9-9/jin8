@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Alert, Clipboard } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { logout, getCurrentUser } from '../services/authService';
 import { CommonActions } from '@react-navigation/native';
@@ -96,7 +96,14 @@ const SettingsScreen = ({ navigation }) => {
               <Ionicons name="call" size={24} color="#D4AF37" />
             </View>
             <Text style={styles.settingText}>联系我们</Text>
-            <Text style={styles.contactInfo}>微信: jiu11111xiao</Text>
+            <TouchableOpacity 
+              onPress={() => {
+                Clipboard.setString('jiu11111xiao');
+                Alert.alert('成功', '微信ID已复制到剪贴板');
+              }}
+            >
+              <Text style={styles.contactInfo}>微信: jiu11111xiao</Text>
+            </TouchableOpacity>
           </TouchableOpacity>
         </View>
 

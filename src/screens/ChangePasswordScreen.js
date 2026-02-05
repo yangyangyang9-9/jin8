@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { StyleSheet, View, Text, TextInput, TouchableOpacity, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { changePassword } from '../services/authService';
 
 const ChangePasswordScreen = ({ navigation }) => {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
-  const handleChangePassword = () => {
+  const handleChangePassword = async () => {
     if (!currentPassword || !newPassword || !confirmPassword) {
       Alert.alert('提示', '请填写所有字段');
       return;
@@ -18,9 +19,15 @@ const ChangePasswordScreen = ({ navigation }) => {
       return;
     }
 
-    // 模拟密码修改
-    Alert.alert('成功', '密码修改成功');
-    navigation.goBack();
+    // 调用修改密码函数
+    const result = await changePassword(currentPassword, newPassword);
+    
+    if (result.success) {
+      Alert.alert('成功', result.message);
+      navigation.goBack();
+    } else {
+      Alert.alert('提示', result.message);
+    }
   };
 
   return (

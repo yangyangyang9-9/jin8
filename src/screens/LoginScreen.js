@@ -40,13 +40,12 @@ const LoginScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>生产线管理系统</Text>
-        <Text style={styles.subtitle}>登录以访问系统</Text>
+        <Text style={styles.title}>沙金生产线管理系统</Text>
       </View>
 
       <View style={styles.form}>
         <View style={styles.inputContainer}>
-          <Text style={styles.label}>用户名</Text>
+          <Text style={styles.label}>用户名（不可更改）</Text>
           <TextInput
             style={styles.input}
             value={username}

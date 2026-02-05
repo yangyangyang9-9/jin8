@@ -52,7 +52,7 @@ const RegisterScreen = ({ navigation }) => {
 
       <View style={styles.form}>
         <View style={styles.inputContainer}>
-          <Text style={styles.label}>用户名</Text>
+          <Text style={styles.label}>用户名（不可更改）</Text>
           <TextInput
             style={styles.input}
             value={username}
